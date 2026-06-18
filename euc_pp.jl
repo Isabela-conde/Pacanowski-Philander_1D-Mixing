@@ -188,7 +188,7 @@ ax[1].plot([m_d.solution.U[i] for i in 1:length(zc)], zc, "C0", label = "deep fi
 ax[1].plot([m_s.solution.U[i] for i in 1:length(zc)], zc, "C3", label = "shoaled final")
 ax[1].axvline(0, color = "grey", lw = 0.7)
 ax[1].set_xlabel("u [m/s]"); ax[1].set_ylabel("z [m]"); ax[1].legend(fontsize = 7)
-ax[1].set_title("Velocity (dashed=init, solid=final)")
+ax[1].set_title("Velocity")
 
 # (2) surface velocity vs time
 ax[2].plot(t ./ day, us_d, "C0", label = "deep EUC")
@@ -199,9 +199,9 @@ ax[2].legend(fontsize = 8); ax[2].set_title("Surface flow vs time")
 # (3) core-depth sweep -> final surface velocity
 ax[3].plot(collect(cores), usurf_final, "ko-")
 ax[3].set_xlabel("EUC core depth [m]"); ax[3].set_ylabel("final surface u [m/s]")
-ax[3].invert_xaxis(); ax[3].set_title("Surface flow vs EUC depth")
+ax[3].set_title("Surface flow vs EUC depth")
 
-suptitle("OceanTurb PP: shoaling the EUC weakens the westward surface flow")
+# suptitle("OceanTurb PP: shoaling the EUC weakens the westward surface flow")
 tight_layout()
 savefig("euc_pp.png", dpi = 150)
 println("saved euc_pp.png")
