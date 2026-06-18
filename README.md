@@ -4,19 +4,6 @@ A small set of [OceanTurb.jl](https://github.com/glwagner/OceanTurb.jl) experime
 **Pacanowski–Philander (1981)** Richardson-number-dependent vertical mixing scheme to test how
 **shoaling the Equatorial Undercurrent (EUC)** changes the surface flow through shear-driven mixing.
 
-> ⚠️ This is a 1-D column model with **no interior body force** (no zonal pressure gradient to hold
-> the EUC up). The experiments are therefore **transient initial-value problems**: a jet structure is
-> initialised and allowed to evolve under Ri-dependent mixing. The interesting physics lives in the
-> early transient — see *Caveats* below.
-
-## Contents
-
-| File | Description |
-|------|-------------|
-| `pp_shear_driven.jl` | Minimal wind-driven shear-mixing example (reference for the OceanTurb PP API). |
-| `euc_pp.jl` | EUC-shoaling sensitivity experiment: deep vs shoaled EUC, with Hovmöller diagnostics. |
-| `euc_pp.png` | 3-panel summary: velocity profiles, surface u vs time, surface u vs EUC core depth. |
-| `euc_hovmoller.png` | Time–depth Hovmöller of Ri and ν (eddy viscosity) for deep vs shoaled. |
 
 ## The Pacanowski–Philander scheme
 
@@ -64,32 +51,8 @@ $$U_0(z) = U_\text{sec}\,e^{z/h_\text{sec}} + U_\text{euc}\,\exp\!\left(-\frac{(
 - **Forcing**: optional easterly surface wind stress applied as a flux boundary condition on $U$.
 - **Time stepping**: backward-Euler (unconditionally stable for the implicit diffusion).
 
-## Running
 
-```julia
-# from the Julia REPL, in this directory
-] add OceanTurb PyPlot     # one-time
-include("euc_pp.jl")
-```
-
-Requires `OceanTurb`, `PyPlot` (and `ffmpeg` only if the optional U(z,t) animation block is enabled).
-Outputs `euc_pp.png` and `euc_hovmoller.png`.
-
-## Caveats — why long runs lose the signal
-
-The velocity equation is **conservative vertical diffusion** with no momentum sink and no forcing that
-sustains the jets. Two integral constraints follow:
-
-- **Momentum is conserved**: $\frac{d}{dt}\int U\,dz =$ surface flux − bottom flux (zero in the unforced case).
-- **Energy/shear is dissipated**: $\frac{d}{dt}\int \tfrac12 U^2\,dz = -\int \nu\,(\partial_z U)^2\,dz \le 0$.
-
-So the eddy viscosity dissipates *shear*, and with nothing to maintain the EUC every initial condition
-relaxes toward the **same well-mixed, depth-uniform profile** set by its (conserved) integrated momentum.
-Because the deep and shoaled jets carry nearly the same integrated momentum, their profiles **converge at
-long times**. This is a property of the experimental configuration, not a numerical instability — the
-deep-vs-shoaled comparison is only meaningful during the early transient.
 
 ## Acknowledgements
 
-Developed with the assistance of **Claude** (Anthropic), which helped adapt the OceanTurb PP API,
-build the diagnostics and Hovmöller plots, and document the model equations and conservation properties.
+Developed with the assistance of **Claude** (Anthropic), which helped build diagnostics and Hovmöller plots, and document the model equations and conservation properties.
