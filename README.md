@@ -2,7 +2,7 @@
 
 A small set of [OceanTurb.jl](https://github.com/glwagner/OceanTurb.jl) experiments using the
 **Pacanowski–Philander (1981)** Richardson-number-dependent vertical mixing scheme to test how
-**shoaling the Equatorial Undercurrent (EUC)** changes the surface flow through shear-driven mixing.
+**shoaling the Equatorial Undercurrent (EUC)** changes the surface flow through shear-driven mixing, `euc_pp.jl` does this, whereas `pp_shear_driven.jl` is an `OceanTurb.jl` example modified to run with Pacanowski-Philander scheme.
 
 
 ## The Pacanowski–Philander scheme
@@ -48,9 +48,7 @@ As $Ri \to \infty$ (strongly stratified) they relax to the background values $\n
 $$U_0(z) = U_\text{sec}\,e^{z/h_\text{sec}} + U_\text{euc}\,\exp\!\left(-\frac{(-z - h_\text{core})^2}{2\,\sigma_\text{euc}^2}\right)$$
 
 - **Comparison**: a *deep* EUC (`h_core = 130 m`) vs a *shoaled* EUC (`h_core = 80 m`), plus a sweep over core depth.
-- **Forcing**: optional easterly surface wind stress applied as a flux boundary condition on $U$.
-- **Time stepping**: backward-Euler (unconditionally stable for the implicit diffusion).
-
+- **Forcing**: easterly surface wind stress applied as a flux boundary condition on $U$.
 
 
 ## Acknowledgements
