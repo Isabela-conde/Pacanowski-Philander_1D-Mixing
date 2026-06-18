@@ -55,4 +55,4 @@ $$U_0(z) = U_\text{sec}\,e^{z/h_\text{sec}} + U_\text{euc}\,\exp\!\left(-\frac{(
 
 ## Acknowledgements
 
-Developed with the assistance of **Claude** (Anthropic), which helped build diagnostics and Hovmöller plots, and document the model equations and conservation properties.
+Developed with the assistance of **Claude** (Anthropic), which helped build diagnostics and Hovmöller plots, and document the model equations.
