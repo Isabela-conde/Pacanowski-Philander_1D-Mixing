@@ -1,6 +1,6 @@
 # Pacanowski–Philander 1-D Mixing — EUC shoaling experiment
 
-A small set of [OceanTurb.jl](https://github.com/glwagner/OceanTurb.jl) experiments using the
+An [OceanTurb.jl](https://github.com/glwagner/OceanTurb.jl) experiment using the
 **Pacanowski–Philander (1981)** Richardson-number-dependent vertical mixing scheme to test how
 **shoaling the Equatorial Undercurrent (EUC)** changes the surface flow through shear-driven mixing, `euc_pp.jl` does this, whereas `pp_shear_driven.jl` is an `OceanTurb.jl` example modified to run with Pacanowski-Philander scheme.
 
