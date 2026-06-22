@@ -175,9 +175,9 @@ LogNorm = PyPlot.matplotlib.colors.LogNorm
 zmin    = -200.0                          # depth window to display
 
 fig2, axmat2 = subplots(2, 2, figsize = (13, 8), sharex = true, sharey = true)
-ax2 = vec(permutedims(axmat2))            # [Ri deep, Ri shoaled, ν deep, ν shoaled]
+ax2 = vec(permutedims(axmat2))           
 
-# --- Ri panels (clip to [0,1]; overlay the Ri_crit contour) -----------------
+# Ri
 for (a, M, td, ttl) in ((ax2[1], RiM_d, ts_d, "Ri   deep EUC ($(Int(h_deep)) m)"),
                         (ax2[2], RiM_s, ts_s, "Ri   shoaled EUC ($(Int(h_shoal)) m)"))
     days = td ./ day
@@ -188,12 +188,13 @@ for (a, M, td, ttl) in ((ax2[1], RiM_d, ts_d, "Ri   deep EUC ($(Int(h_deep)) m)"
     colorbar(pc, ax = a, label = "Ri")
 end
 
-# --- ν panels (log colour scale) -------------------------------------------
-for (a, M, td, ttl) in ((ax2[3], νM_d, ts_d, "ν   deep EUC ($(Int(h_deep)) m)"),
-                        (ax2[4], νM_s, ts_s, "ν   shoaled EUC ($(Int(h_shoal)) m)"))
+# ν  (red contour marks Ri = Ri_crit, i.e. where shear instability switches mixing on)
+for (a, M, Mri, td, ttl) in ((ax2[3], νM_d, RiM_d, ts_d, "ν   deep EUC ($(Int(h_deep)) m)"),
+                             (ax2[4], νM_s, RiM_s, ts_s, "ν   shoaled EUC ($(Int(h_shoal)) m)"))
     days = td ./ day
     pc = a.pcolormesh(days, zf, clamp.(M, 1e-6, 1e-1), cmap = "magma",
                       norm = LogNorm(vmin = 1e-5, vmax = 1e-2), shading = "auto")
+    a.contour(days, zf, Mri, levels = [Ri_crit], colors = "r", linewidths = 1.3)
     a.set_ylim(zmin, 0); a.set_title(ttl)
     a.set_xlabel("time [days]"); a.set_ylabel("z [m]")
     colorbar(pc, ax = a, label = "ν [m²/s]")

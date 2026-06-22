@@ -1,8 +1,3 @@
-# using OceanTurb
-
-# using OceanTurb.PacanowskiPhilander: Parameters
-
-# @use_pyplot_utils # add utilities for plotting OceanTurb Fields
 
 
 using OceanTurb
@@ -10,16 +5,7 @@ using OceanTurb
 using OceanTurb.PacanowskiPhilander: Parameters, KU, KT, local_richardson
 
 @use_pyplot_utils
-# using PyPlot   # provides subplots, plot, sca, cla, xlabel, legend, L"...", etc.
- 
-# # Plotting helpers that used to come from @use_pyplot_utils (removed from OceanTurb).
-# # Let `plot` accept an OceanTurb Field directly, and add the removespines helper.
-# import PyPlot: plot
-# plot(f::OceanTurb.AbstractField, args...; kwargs...) =
-#     plot(OceanTurb.data(f), OceanTurb.nodes(f), args...; kwargs...)
-# removespine(side, ax=gca()) = ax.spines[side].set_visible(false)
-# removespines(sides...; ax=gca()) = for side in sides; removespine(side, ax); end
- 
+
 function makeplot!(fig, axs, model)
  
     fig.suptitle("\$ t = \$ $(prettytime(model.clock.time))")
