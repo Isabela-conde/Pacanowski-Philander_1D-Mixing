@@ -11,7 +11,7 @@ using InteractiveUtils
 # Physical constants -- equator, so f = 0
 constants = Constants(f = 0.0, α = 2.0e-4, β = 8.0e-4, ρ₀ = 1025.0, g = 9.81)
 
-# stratification 
+# stratification
 Tdeep, ΔT, h_th, δ_th = 14.0, 8.0, 30.0, 25.0
 T₀(z) = Tdeep + 0.5ΔT * (1 + tanh((z + h_th) / δ_th))
 S₀(z) = 35.0
@@ -24,7 +24,7 @@ U₀(z, h_core) = U_sec * exp(z / h_sec) +
 
 #  thresholds
 Ri_crit = 0.25
-z_mld   = 70.0   
+z_mld   = 70.0
 
 function pp_diagnostics(model)
     Ri = FaceField(model.grid)
@@ -62,7 +62,7 @@ end
 
 # Build and run one experiment
 function run_pp(h_core; N = 128, H = 300.0, mixing = true,
-                Δt = 10minute, tfinal = 6day, wind_stress = 0.05, 
+                Δt = 10minute, tfinal = 6day, wind_stress = 0.05,
                 snapshots = false, save_every = 3)    # set wind stress
 
     params = mixing ? Parameters() :                      # PP81/CV12 defaults
@@ -82,7 +82,7 @@ function run_pp(h_core; N = 128, H = 300.0, mixing = true,
                                       stepper = :BackwardEuler,
                                       bcs = bcs)
 
-    # initial conditions 
+    # initial conditions
     model.solution.U = z -> U₀(z, h_core)
     model.solution.V = z -> 0.0
     model.solution.T = T₀
@@ -175,7 +175,7 @@ LogNorm = PyPlot.matplotlib.colors.LogNorm
 zmin    = -200.0                          # depth window to display
 
 fig2, axmat2 = subplots(2, 2, figsize = (13, 8), sharex = true, sharey = true)
-ax2 = vec(permutedims(axmat2))           
+ax2 = vec(permutedims(axmat2))
 
 # Ri
 for (a, M, td, ttl) in ((ax2[1], RiM_d, ts_d, "Ri   deep EUC ($(Int(h_deep)) m)"),
@@ -204,4 +204,3 @@ suptitle("Hovmöller diagrams of Ri and ν")
 tight_layout()
 savefig("euc_hovmoller.png", dpi = 150)
 println("saved euc_hovmoller.png")
-
