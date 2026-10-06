@@ -185,15 +185,16 @@ end
 # -----------------------------------------------------------------------------
 # MAIN RUNS: isolate the two warming routes against a cold-tongue background
 # -----------------------------------------------------------------------------
-w0   = 2.0e-5     # ~1.7 m/day upwelling
-ΔQ   = 80.0       # local surface warming [W/m²]
-ΔTsc = 3.0        # remote source-water warming [°C]
+w0    = 2.0e-5     # ~1.7 m/day upwelling
+ΔQ    = 80.0       # local surface warming [W/m²]
+ΔTsc  = 3.0        # remote source-water warming [°C]
+λ_sfc = 25.0       # surface warming enters as PENETRATING shortwave, e-folding [m]
 
 noup  = run_case(label = "NOUP",     w₀ = 0.0, save_profiles = true)
 upw   = run_case(label = "UPW",      w₀ = w0,  save_profiles = true)
-upsfc = run_case(label = "UPW+SFC",  w₀ = w0,  Q_sfc = ΔQ,                save_profiles = true)
-upsrc = run_case(label = "UPW+SRC",  w₀ = w0,  ΔT_src = ΔTsc,             save_profiles = true)
-upboth= run_case(label = "UPW+BOTH", w₀ = w0,  Q_sfc = ΔQ, ΔT_src = ΔTsc, save_profiles = true)
+upsfc = run_case(label = "UPW+SFC",  w₀ = w0,  Q_sfc = ΔQ, λ_pen = λ_sfc,              save_profiles = true)
+upsrc = run_case(label = "UPW+SRC",  w₀ = w0,  ΔT_src = ΔTsc,                           save_profiles = true)
+upboth= run_case(label = "UPW+BOTH", w₀ = w0,  Q_sfc = ΔQ, ΔT_src = ΔTsc, λ_pen = λ_sfc, save_profiles = true)
 mains = (noup, upw, upsfc, upsrc, upboth)
 cols  = Dict("NOUP"=>"k", "UPW"=>"C0", "UPW+SFC"=>"C1", "UPW+SRC"=>"C3", "UPW+BOTH"=>"C2")
 
@@ -248,8 +249,8 @@ sst_base = Float64[]; sst_src = Float64[]; sst_sfc = Float64[]; sst_both = Float
 for w in w0s
     b  = run_case(label = "sw-base", w₀ = w,                            Δt = 10minute, tfinal = 200day)
     s  = run_case(label = "sw-src",  w₀ = w, ΔT_src = ΔTsc,             Δt = 10minute, tfinal = 200day)
-    f  = run_case(label = "sw-sfc",  w₀ = w, Q_sfc  = ΔQ,               Δt = 10minute, tfinal = 200day)
-    bo = run_case(label = "sw-both", w₀ = w, Q_sfc = ΔQ, ΔT_src = ΔTsc, Δt = 10minute, tfinal = 200day)
+    f  = run_case(label = "sw-sfc",  w₀ = w, Q_sfc  = ΔQ, λ_pen = λ_sfc,              Δt = 10minute, tfinal = 200day)
+    bo = run_case(label = "sw-both", w₀ = w, Q_sfc = ΔQ, ΔT_src = ΔTsc, λ_pen = λ_sfc, Δt = 10minute, tfinal = 200day)
     push!(sst_base, b.sstss); push!(sst_src, s.sstss)
     push!(sst_sfc, f.sstss);  push!(sst_both, bo.sstss)
 end
@@ -311,8 +312,9 @@ savefig("upwelling_anomaly_hovmoller.png", dpi = 150)
 println("saved upwelling_anomaly_hovmoller.png")
 
 # ------------------------------------------------------------------------------
-# FIGURE 4 -- compare experiments: T and N² profiles, all runs overlaid, at the
-# start / middle / end (same style as the warming-scenario profiles figure).
+# FIGURE 4 -- compare experiments: T and N² profiles at start / middle / end.
+# Decluttered: BOTH is dropped, and the surface case uses the HIGHEST shortwave
+# penetration (λ = 50 m, most generous for reaching depth).
 # SST is the surface value of T(z); N² = g·α·∂zT (S is constant here).
 # ------------------------------------------------------------------------------
 function n2_profile(Tcol, zc)
@@ -323,11 +325,14 @@ function n2_profile(Tcol, zc)
     return zmid, N2
 end
 
+upsfc50 = run_case(label = "UPW+SFC (λ=50 m)", w₀ = w0, Q_sfc = ΔQ, λ_pen = 50.0,
+                   save_profiles = true)
+profs = ((noup, "k"), (upw, "C0"), (upsfc50, "C1"), (upsrc, "C3"))
+
 fig4, ax4 = subplots(3, 2, figsize = (11, 14), sharey = true)
 
-im = cld(length(mains[1].tsnaps), 2)     # middle snapshot index
-for c in mains
-    col = cols[c.label]
+im = cld(length(noup.tsnaps), 2)     # middle snapshot index
+for (c, col) in profs
     ax4[1,1].plot(c.Tsn[1],   c.zc, col, label = c.label)
     z0, n0 = n2_profile(c.Tsn[1],   c.zc); ax4[1,2].plot(n0, z0, col, label = c.label)
     ax4[2,1].plot(c.Tsn[im],  c.zc, col, label = c.label)
@@ -336,8 +341,8 @@ for c in mains
     zE, nE = n2_profile(c.Tsn[end], c.zc); ax4[3,2].plot(nE, zE, col, label = c.label)
 end
 
-tM = mains[1].tsnaps[im]  / day
-tE = mains[1].tsnaps[end] / day
+tM = noup.tsnaps[im]  / day
+tE = noup.tsnaps[end] / day
 ax4[1,1].set_title("initial:  T(z)   (top = SST)");             ax4[1,2].set_title("initial:  N²(z)")
 ax4[2,1].set_title(@sprintf("middle (t = %.0f d):  T(z)", tM)); ax4[2,2].set_title(@sprintf("middle (t = %.0f d):  N²(z)", tM))
 ax4[3,1].set_title(@sprintf("final (t = %.0f d):  T(z)",  tE)); ax4[3,2].set_title(@sprintf("final (t = %.0f d):  N²(z)",  tE))
@@ -381,14 +386,14 @@ zmid, Mupw = n2_hov(upw)
 Dsfc = n2_hov(upsfc)[2] .- Mupw
 Dsrc = n2_hov(upsrc)[2] .- Mupw
 dmax = max(maximum(abs.(Dsfc)), maximum(abs.(Dsrc)))
-for (a, D, ttl) in ((ex[2], Dsfc, "ΔN²  SFC − UPW  (surface warming)"),
+for (a, D, ttl) in ((ex[2], Dsfc, @sprintf("ΔN²  SFC − UPW  (penetrating surface, λ=%d m)", Int(λ_sfc))),
                     (ex[3], Dsrc, "ΔN²  SRC − UPW  (source warming)"))
     pc = a.pcolormesh(upw.tsnaps ./ day, zmid, D, cmap = "RdBu_r",
                       vmin = -dmax, vmax = dmax, shading = "auto")
     a.set_ylim(-150, 0); a.set_xlabel("time [days]"); a.set_ylabel("z [m]")
     a.set_title(ttl); colorbar(pc, ax = a, label = "ΔN² [s⁻²]")
 end
-suptitle("Stability response: surface warming vs source warming (relative to UPW).  Red = more stable, blue = less stable")
+suptitle(@sprintf("Stability response: penetrating surface warming (λ=%d m) vs source warming, relative to UPW.  Red = more stable, blue = less stable", Int(λ_sfc)))
 tight_layout()
 savefig("upwelling_stability.png", dpi = 150)
 println("saved upwelling_stability.png")
