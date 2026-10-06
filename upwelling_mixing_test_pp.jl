@@ -89,11 +89,15 @@ end
 #   Q_sfc   extra surface heating [W/m²]  (local warming route)
 #   ΔT_src  source-water warming [°C]     (remote warming route, carried up by w)
 # -----------------------------------------------------------------------------
-function run_case(; label, w₀ = 0.0, Q_sfc = 0.0, ΔT_src = 0.0, λ_fb = 25.0,
+function run_case(; label, w₀ = 0.0, Q_sfc = 0.0, ΔT_src = 0.0, λ_fb = 25.0, λ_pen = 0.0,
                     N = 128, H = 300.0, Δt = 10minute, tfinal = 200day,
                     wind_stress = 0.01, save_profiles = false, save_every = 288)
 
-    Qᵀ = -Q_sfc / (constants.ρ₀ * cp)      # −ve top T flux = heating (see mixing test)
+    # surface heating enters either as a surface flux (λ_pen = 0; only reaches depth
+    # by mixing) or as penetrating shortwave ∝ (1/λ_pen)·exp(z/λ_pen) that deposits
+    # Q_sfc over an e-folding depth λ_pen (λ_pen > 0). The latter tests whether
+    # surface heat can PENETRATE locally to the upwelled-water depth.
+    Qᵀ = λ_pen > 0 ? 0.0 : -Q_sfc / (constants.ρ₀ * cp)
     Qᵘ =  wind_stress / constants.ρ₀
 
     bcs = PacanowskiPhilander.BoundaryConditions(
@@ -118,6 +122,9 @@ function run_case(; label, w₀ = 0.0, Q_sfc = 0.0, ΔT_src = 0.0, λ_fb = 25.0,
     zc     = nodes(model.solution.T)
     SST₀   = model.solution.T[N]
     wz     = [w_prof(z, w₀) for z in zc]                         # upwelling at cell centres
+    # penetrating shortwave heating increment per step [°C]; ∫ over depth = Q_sfc
+    rad    = λ_pen > 0 ? [(Q_sfc / (constants.ρ₀ * cp)) * exp(z / λ_pen) / λ_pen * Δt for z in zc] :
+                         zeros(length(zc))
     # source-restoring target: warming anomaly ramps from 0 at z_restore to full
     # ΔT_src by z_restore − d_ramp, so there is no step inversion at the edge.
     d_ramp = 40.0
@@ -144,6 +151,12 @@ function run_case(; label, w₀ = 0.0, Q_sfc = 0.0, ΔT_src = 0.0, λ_fb = 25.0,
         # (1) upwind vertical advection of T by w (w>0 upward; upstream = below)
         @inbounds for i in N:-1:2
             model.solution.T[i] += -wz[i] * (model.solution.T[i] - model.solution.T[i-1]) / Δz * Δt
+        end
+        # (1b) penetrating shortwave heating (λ_pen > 0)
+        if λ_pen > 0
+            @inbounds for i in 1:N
+                model.solution.T[i] += rad[i]
+            end
         end
         # (2) deep source-water restoring (maintains / warms the upwelled water)
         @inbounds for i in 1:N
@@ -336,3 +349,86 @@ suptitle("Experiments compared: initial / middle / final  T and N² profiles")
 tight_layout()
 savefig("upwelling_profiles.png", dpi = 150)
 println("saved upwelling_profiles.png")
+
+# ------------------------------------------------------------------------------
+# FIGURE 5 -- STABILITY test.  Tests "increased surface warming makes it LESS
+# stable" against "warmer source waters change the stability", on stability terms:
+#   (a) column stability index  ⟨N²⟩₀₋₁₀₀ₘ  vs time  -> does SFC go up or down?
+#   (b,c) ΔN²(z,t) = N²(exp) − N²(UPW) for SFC and SRC -> where/when stability shifts
+# This isolates the LOCAL response (1D: surface heat cannot reach the thermocline
+# except by mixing), so it shows how much of the claim needs the circulation.
+# ------------------------------------------------------------------------------
+function meanN2(Tcol, zc, zlo, zhi)
+    zmid, N2 = n2_profile(Tcol, zc)
+    vals = [N2[i] for i in eachindex(N2) if zlo <= zmid[i] <= zhi]
+    return isempty(vals) ? NaN : sum(vals) / length(vals)
+end
+n2_hov(c) = (n2_profile(c.Tsn[1], c.zc)[1],
+             reduce(hcat, [n2_profile(snap, c.zc)[2] for snap in c.Tsn]))
+
+fig5, ex = subplots(1, 3, figsize = (17, 5))
+
+# (a) column stability index vs time
+for c in mains
+    idx = [meanN2(snap, c.zc, -100.0, 0.0) for snap in c.Tsn]
+    ex[1].plot(c.tsnaps ./ day, idx, cols[c.label], label = c.label)
+end
+ex[1].set_xlabel("time [days]"); ex[1].set_ylabel("⟨N²⟩ 0–100 m [s⁻²]")
+ex[1].set_title("Column stability vs time"); ex[1].legend(fontsize = 7)
+
+# (b,c) ΔN²(z,t) vs UPW for SFC and SRC, shared colour scale
+zmid, Mupw = n2_hov(upw)
+Dsfc = n2_hov(upsfc)[2] .- Mupw
+Dsrc = n2_hov(upsrc)[2] .- Mupw
+dmax = max(maximum(abs.(Dsfc)), maximum(abs.(Dsrc)))
+for (a, D, ttl) in ((ex[2], Dsfc, "ΔN²  SFC − UPW  (surface warming)"),
+                    (ex[3], Dsrc, "ΔN²  SRC − UPW  (source warming)"))
+    pc = a.pcolormesh(upw.tsnaps ./ day, zmid, D, cmap = "RdBu_r",
+                      vmin = -dmax, vmax = dmax, shading = "auto")
+    a.set_ylim(-150, 0); a.set_xlabel("time [days]"); a.set_ylabel("z [m]")
+    a.set_title(ttl); colorbar(pc, ax = a, label = "ΔN² [s⁻²]")
+end
+suptitle("Stability response: surface warming vs source warming (relative to UPW).  Red = more stable, blue = less stable")
+tight_layout()
+savefig("upwelling_stability.png", dpi = 150)
+println("saved upwelling_stability.png")
+
+# ------------------------------------------------------------------------------
+# FIGURE 6 -- PENETRATION test of the speaker's claim.  Surface heating applied
+# as penetrating shortwave with e-folding λ_pen (10/25/50 m): does it reach the
+# upwelling source depth and warm the upwelled water, LOCALLY?  Benchmarked
+# against SRC, where the source water is warmed directly.
+#   (a) final warming anomaly ΔT(z) = T − T_UPW  -> how deep surface heat gets
+#   (b) warming at the source depth z_src vs time -> does the upwelled water warm?
+# ------------------------------------------------------------------------------
+λpens  = (10.0, 25.0, 50.0)
+sfcpen = [run_case(label = "SFC λ=$(Int(λ))m", w₀ = w0, Q_sfc = ΔQ, λ_pen = λ,
+                   save_profiles = true) for λ in λpens]
+pcols  = ("C0", "C1", "C4")
+
+fig6, gx = subplots(1, 2, figsize = (13, 5.5))
+
+# (a) final warming-anomaly profiles (vs UPW)
+for (c, pc) in zip(sfcpen, pcols)
+    gx[1].plot(c.Tfinal .- upw.Tfinal, c.zc, pc, label = c.label)
+end
+gx[1].plot(upsrc.Tfinal .- upw.Tfinal, upsrc.zc, "C3", label = @sprintf("SRC (+%.0f°C source)", ΔTsc))
+gx[1].axhline(z_src, color = "grey", ls = ":", lw = 1)
+gx[1].text(0.03, z_src + 3, "upwelling source", transform = gx[1].get_yaxis_transform(),
+           fontsize = 7, color = "grey")
+gx[1].set_ylim(-150, 0); gx[1].set_xlabel("ΔT = T − T_UPW  [°C]"); gx[1].set_ylabel("z [m]")
+gx[1].set_title("Final warming anomaly: how deep does surface heat get?"); gx[1].legend(fontsize = 7)
+
+# (b) warming reaching the upwelling source depth vs time
+for (c, pc) in zip(sfcpen, pcols)
+    gx[2].plot(c.t ./ day, c.Tsrc .- upw.Tsrc, pc, label = c.label)
+end
+gx[2].plot(upsrc.t ./ day, upsrc.Tsrc .- upw.Tsrc, "C3", label = "SRC")
+gx[2].axhline(0, color = "grey", lw = 0.7)
+gx[2].set_xlabel("time [days]"); gx[2].set_ylabel(@sprintf("ΔT at %d m  [°C]", Int(-z_src)))
+gx[2].set_title("Warming reaching the upwelled water"); gx[2].legend(fontsize = 7)
+
+suptitle("Can LOCAL surface-heat penetration warm the upwelled water?  (vs SRC = source warmed directly)")
+tight_layout()
+savefig("upwelling_penetration.png", dpi = 150)
+println("saved upwelling_penetration.png")
