@@ -437,3 +437,33 @@ suptitle("Can LOCAL surface-heat penetration warm the upwelled water?  (vs SRC =
 tight_layout()
 savefig("upwelling_penetration.png", dpi = 150)
 println("saved upwelling_penetration.png")
+
+# ------------------------------------------------------------------------------
+# SUMMARY FIGURE -- clean two-panel version for sharing. Surface warming
+# (penetrating, λ = 50 m) vs source warming, as anomalies from the upwelling-only
+# run. Left: temperature. Right: stratification. Dotted line = upwelling source.
+# ------------------------------------------------------------------------------
+fig7, hx = subplots(1, 2, figsize = (11, 5.5), sharey = true)
+zc7 = upw.zc
+
+hx[1].plot(upsfc50.Tfinal .- upw.Tfinal, zc7, "C1", label = "surface warming")
+hx[1].plot(upsrc.Tfinal   .- upw.Tfinal, zc7, "C3", label = "source warming")
+hx[1].axvline(0, color = "grey", lw = 0.6)
+hx[1].axhline(z_src, color = "grey", ls = ":", lw = 1)
+hx[1].set_ylim(-150, 0); hx[1].set_xlabel("ΔT [°C]"); hx[1].set_ylabel("z [m]")
+hx[1].set_title("Temperature"); hx[1].legend(fontsize = 8)
+
+zsf, nsf = n2_profile(upsfc50.Tfinal, zc7)
+_,   nsr = n2_profile(upsrc.Tfinal,   zc7)
+_,   nup = n2_profile(upw.Tfinal,     zc7)
+hx[2].plot(nsf .- nup, zsf, "C1", label = "surface warming")
+hx[2].plot(nsr .- nup, zsf, "C3", label = "source warming")
+hx[2].axvline(0, color = "grey", lw = 0.6)
+hx[2].axhline(z_src, color = "grey", ls = ":", lw = 1)
+hx[2].set_ylim(-150, 0); hx[2].set_xlabel("ΔN² [s⁻²]")
+hx[2].set_title("Stratification"); hx[2].legend(fontsize = 8)
+
+suptitle("Anomaly from upwelling-only run")
+tight_layout()
+savefig("upwelling_summary.png", dpi = 150)
+println("saved upwelling_summary.png")
