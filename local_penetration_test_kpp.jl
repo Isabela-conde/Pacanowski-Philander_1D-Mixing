@@ -43,6 +43,7 @@ w_prof(z, w₀) = w₀ * (1 - exp(z / δw))
 z_restore = -200.0
 τ_src     = 60day
 z_sub     = -50.0
+z_source  = -120.0        # "source water": the thermocline water that gets upwelled
 
 function T_at(model, ztarget)
     zc = nodes(model.solution.T); i = argmin(abs.(zc .- ztarget))
@@ -108,9 +109,10 @@ function run_case(; Q_sfc = 0.0, λ_pen = 30.0, λ_fb = 50.0, w₀ = 1.0e-5,
     model.solution.T = z -> Tprofile(z); model.solution.S = S₀
 
     nsteps = Int(round(tfinal / Δt))
-    t = Float64[]; sst = Float64[]; Tsub = Float64[]; n2i = Float64[]
+    t = Float64[]; sst = Float64[]; Tsub = Float64[]; Tsrc = Float64[]; n2i = Float64[]
     rec!() = (push!(t, model.clock.time); push!(sst, model.solution.T[N]);
-              push!(Tsub, T_at(model, z_sub)); push!(n2i, meanN2(model, -100.0, 0.0)))
+              push!(Tsub, T_at(model, z_sub)); push!(Tsrc, T_at(model, z_source));
+              push!(n2i, meanN2(model, -100.0, 0.0)))
 
     rec!()
     for n in 1:nsteps
@@ -119,48 +121,63 @@ function run_case(; Q_sfc = 0.0, λ_pen = 30.0, λ_fb = 50.0, w₀ = 1.0e-5,
     end
     rec!()
     Tfinal = [model.solution.T[i] for i in 1:N]
-    return (; t, sst, Tsub, n2i, zc, Tfinal, n2ss = n2i[end])
+    return (; t, sst, Tsub, Tsrc, n2i, zc, Tfinal, n2ss = n2i[end])
 end
 
 # -----------------------------------------------------------------------------
-# A -- illustrative run: strong damping, deep SW, weak upwelling, 2 years
+# A -- illustrative runs: a FAVOURABLE case (most generous for the local
+# mechanism) and a REALISTIC case (east-Pacific-ish λ, upwelling, damping).
 # -----------------------------------------------------------------------------
+function report(base, heat, tag)
+    @printf("%s:  ΔSST=%+.2f  ΔT(%dm)=%+.2f  ΔT_source(%dm)=%+.2f °C   ⟨N²⟩ %.2e->%.2e (Δ=%+.2e)\n",
+            tag, heat.sst[end]-base.sst[end], Int(-z_sub), heat.Tsub[end]-base.Tsub[end],
+            Int(-z_source), heat.Tsrc[end]-base.Tsrc[end], base.n2ss, heat.n2ss, heat.n2ss-base.n2ss)
+end
+
+function mechanism_figure(base, heat; scheme, λpen, w0, λfb, Q, fname)
+    fig, ax = subplots(2, 2, figsize = (13, 9))
+
+    ax[1,1].plot(heat.t ./ day, heat.sst  .- base.sst,  "C3", label = "surface (SST)")
+    ax[1,1].plot(heat.t ./ day, heat.Tsub .- base.Tsub, "C0", label = @sprintf("subsurface (%d m)", Int(-z_sub)))
+    ax[1,1].plot(heat.t ./ day, heat.Tsrc .- base.Tsrc, "C2", label = @sprintf("source water (%d m)", Int(-z_source)))
+    ax[1,1].set_xlabel("time [days]"); ax[1,1].set_ylabel("ΔT [°C]")
+    ax[1,1].set_title("Warming: surface vs subsurface vs source"); ax[1,1].legend(fontsize = 8)
+
+    ax[1,2].plot(base.t ./ day, base.n2i, "k",  label = "no heating")
+    ax[1,2].plot(heat.t ./ day, heat.n2i, "C3", label = "penetrating SW")
+    ax[1,2].set_xlabel("time [days]"); ax[1,2].set_ylabel("⟨N²⟩ 0–100 m [s⁻²]")
+    ax[1,2].set_title("Upper-ocean stratification"); ax[1,2].legend(fontsize = 8)
+
+    ax[2,1].plot(heat.Tfinal .- base.Tfinal, heat.zc, "C3")
+    ax[2,1].axvline(0, color = "grey", lw = 0.6); ax[2,1].set_ylim(-150, 0)
+    ax[2,1].set_xlabel("ΔT [°C]"); ax[2,1].set_ylabel("z [m]"); ax[2,1].set_title("Final ΔT (heated − no heat)")
+
+    zmid, nh = n2_profile(heat.Tfinal, heat.zc)
+    _,    nb = n2_profile(base.Tfinal, base.zc)
+    ax[2,2].plot(nh .- nb, zmid, "C3")
+    ax[2,2].axvline(0, color = "grey", lw = 0.6); ax[2,2].set_ylim(-150, 0)
+    ax[2,2].set_xlabel("ΔN² [s⁻²]"); ax[2,2].set_title("Final ΔN² (heated − no heat)")
+
+    suptitle(@sprintf("%s:  penetrating-SW run vs no-heating run  (identical except Q)\nλ=%.0f m,  w₀=%.2f m/day,  λ_fb=%.0f W m⁻² K⁻¹,  Q=%.0f W m⁻²,  2 yr",
+                      scheme, λpen, w0*86400, λfb, Q))
+    tight_layout(); savefig(fname, dpi = 150); println("saved $fname")
+end
+
+# FAVOURABLE: deep SW, weak upwelling, strong damping (most generous)
 w0_A, λfb_A, λpen_A, Q_A = 0.5e-5, 50.0, 50.0, 80.0
-baseA = run_case(Q_sfc = 0.0, w₀ = w0_A, λ_fb = λfb_A, Δt = 15minute, tfinal = 730day, rec_every = 96)
+baseA = run_case(Q_sfc = 0.0, w₀ = w0_A, λ_fb = λfb_A,                 Δt = 15minute, tfinal = 730day, rec_every = 96)
 heatA = run_case(Q_sfc = Q_A, λ_pen = λpen_A, w₀ = w0_A, λ_fb = λfb_A, Δt = 15minute, tfinal = 730day, rec_every = 96)
+report(baseA, heatA, "KPP favourable")
+mechanism_figure(baseA, heatA; scheme = "KPP · favourable", λpen = λpen_A, w0 = w0_A, λfb = λfb_A, Q = Q_A,
+                 fname = "local_penetration_mechanism_kpp.png")
 
-@printf("KPP illustrative run (λ_pen=%.0fm, w₀=%.1f m/day, λ_fb=%.0f):\n", λpen_A, w0_A*86400, λfb_A)
-@printf("  final ΔSST = %+.2f °C,  ΔT(%dm) = %+.2f °C\n",
-        heatA.sst[end]-baseA.sst[end], Int(-z_sub), heatA.Tsub[end]-baseA.Tsub[end])
-@printf("  ⟨N²⟩ 0–100 m: no-heat %.2e -> heated %.2e  (Δ = %+.2e)\n",
-        baseA.n2ss, heatA.n2ss, heatA.n2ss - baseA.n2ss)
-
-figA, ax = subplots(2, 2, figsize = (13, 9))
-
-ax[1,1].plot(heatA.t ./ day, heatA.sst  .- baseA.sst,  "C3", label = "surface (SST)")
-ax[1,1].plot(heatA.t ./ day, heatA.Tsub .- baseA.Tsub, "C0", label = @sprintf("subsurface (%d m)", Int(-z_sub)))
-ax[1,1].set_xlabel("time [days]"); ax[1,1].set_ylabel("ΔT [°C]")
-ax[1,1].set_title("Warming: surface vs subsurface"); ax[1,1].legend(fontsize = 8)
-
-ax[1,2].plot(baseA.t ./ day, baseA.n2i, "k",  label = "no heating")
-ax[1,2].plot(heatA.t ./ day, heatA.n2i, "C3", label = "penetrating SW")
-ax[1,2].set_xlabel("time [days]"); ax[1,2].set_ylabel("⟨N²⟩ 0–100 m [s⁻²]")
-ax[1,2].set_title("Upper-ocean stratification"); ax[1,2].legend(fontsize = 8)
-
-ax[2,1].plot(heatA.Tfinal .- baseA.Tfinal, heatA.zc, "C3")
-ax[2,1].axvline(0, color = "grey", lw = 0.6); ax[2,1].set_ylim(-150, 0)
-ax[2,1].set_xlabel("ΔT [°C]"); ax[2,1].set_ylabel("z [m]"); ax[2,1].set_title("Final ΔT (heated − no heat)")
-
-zmid, nh = n2_profile(heatA.Tfinal, heatA.zc)
-_,    nb = n2_profile(baseA.Tfinal, baseA.zc)
-ax[2,2].plot(nh .- nb, zmid, "C3")
-ax[2,2].axvline(0, color = "grey", lw = 0.6); ax[2,2].set_ylim(-150, 0)
-ax[2,2].set_xlabel("ΔN² [s⁻²]"); ax[2,2].set_title("Final ΔN² (heated − no heat)")
-
-suptitle("KPP: local penetrating shortwave under strong SST damping")
-tight_layout()
-savefig("local_penetration_mechanism_kpp.png", dpi = 150)
-println("saved local_penetration_mechanism_kpp.png")
+# REALISTIC: shallow SW (~20 m), cold-tongue upwelling (~1.5 m/day), moderate damping
+w0_R, λfb_R, λpen_R, Q_R = 1.74e-5, 30.0, 20.0, 80.0
+baseR = run_case(Q_sfc = 0.0, w₀ = w0_R, λ_fb = λfb_R,                 Δt = 15minute, tfinal = 730day, rec_every = 96)
+heatR = run_case(Q_sfc = Q_R, λ_pen = λpen_R, w₀ = w0_R, λ_fb = λfb_R, Δt = 15minute, tfinal = 730day, rec_every = 96)
+report(baseR, heatR, "KPP realistic ")
+mechanism_figure(baseR, heatR; scheme = "KPP · realistic", λpen = λpen_R, w0 = w0_R, λfb = λfb_R, Q = Q_R,
+                 fname = "local_penetration_mechanism_kpp_realistic.png")
 
 # -----------------------------------------------------------------------------
 # B -- regime map: ΔN²(λ_pen, w₀).  Negative = destratified.
